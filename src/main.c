@@ -6,7 +6,7 @@
 #include <memory.h>
 #include <string.h>
 
-typedef unsigned char byte;
+#include "readimage/io.h"
 
 typedef enum BMPCompMethod {
     BI_RGB            = 0,
@@ -52,11 +52,6 @@ typedef struct __attribute__((packed)) BMPHeader {
     uint32_t      colorUsed;
     uint32_t      colorImportant;
 } BMPHeader;
-
-typedef struct ByteBuffer {
-    byte *data;
-    uint64_t size;
-} ByteBuffer;
 
 typedef struct Color {
     uint8_t b, g, r;
@@ -142,33 +137,6 @@ ReadBMPStatus BMPImage_Read(const ByteBuffer *buffer, BMPImage **out) {
     return READBMP_OK;
 }
 
-typedef enum ReadFileStatus {
-    READFILE_OK  = 0,
-    READFILE_ERR = 1,
-} ReadFileStatus;
-
-ReadFileStatus ByteBuffer_ReadFile(const char *filePath, ByteBuffer **out) {
-    FILE *fstream = fopen(filePath, "r");
-    if (fstream == NULL) {
-        return READFILE_ERR;
-    }
-
-    fseek(fstream, 0, SEEK_END);
-    uint64_t fileSize = ftell(fstream);
-    fseek(fstream, 0, SEEK_SET);
-
-    ByteBuffer *buffer = malloc(sizeof(ByteBuffer));
-    buffer->data = malloc(sizeof(byte) * fileSize + 1);
-    buffer->size = fileSize;
-
-    fread(buffer->data, sizeof(byte), fileSize, fstream);
-    fclose(fstream);
-
-    buffer->data[fileSize] = '\0';
-    *out = buffer;
-
-    return READFILE_OK;
-}
 
 void BMPImage_PrintInfo(BMPImage *image) {
     printf("Type \t\t\t: %d\n"        , image->header->type);
