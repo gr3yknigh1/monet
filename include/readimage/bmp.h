@@ -77,6 +77,9 @@ ReadBMPStatus BMPImage_Read(const ByteBuffer *buffer, BMPImage **out) {
     BMPHeader *header = malloc(sizeof(BMPHeader));
     BMPImage  *image  = malloc(sizeof(BMPImage ));
 
+    *header = (BMPHeader) {0};
+    *image  = (BMPImage) {0};
+
     image->header = header;
 
     COPY_FROM_BUFFER(buffer, BMPHeader, type, header);
