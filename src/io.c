@@ -3,7 +3,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef WIN32
+# include <io.h>
+# define F_OK 0
+# define access _access
+#else
+# include <unistd.h>
+#endif
+
 ReadFileStatus ByteBuffer_ReadFile(const char *filePath, ByteBuffer **out) {
+    if (access(filePath, F_OK) != 0) {
+        return READFILE_FILENOTEXITS;
+    }
+
     FILE *fstream = fopen(filePath, "r");
     if (fstream == NULL) {
         return READFILE_ERR;

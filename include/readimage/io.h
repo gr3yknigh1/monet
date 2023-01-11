@@ -13,6 +13,7 @@ typedef struct ByteBuffer {
 typedef enum ReadFileStatus {
     READFILE_OK  = 0,
     READFILE_ERR = 1,
+    READFILE_FILENOTEXITS = 5,
 } ReadFileStatus;
 
 ReadFileStatus ByteBuffer_ReadFile(const char *filePath, ByteBuffer **out);
