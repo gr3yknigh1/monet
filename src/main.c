@@ -1,98 +1,215 @@
-#include <ctype.h>
+#include <bits/stdint-uintn.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
-#include <stdbool.h>
-
-enum {
-    OK,
-    ERR,
-};
+#include <stddef.h>
+#include <memory.h>
+#include <string.h>
 
 typedef unsigned char byte;
 
+typedef enum BMPCompMethod {
+    BI_RGB            = 0,
+    BI_RLE8           = 1,
+    BI_RLE4           = 2,
+    BI_BITFIELDS      = 3,
+    BI_JPEG           = 4,
+    BI_PNG            = 5,
+    BI_ALPHABITFIELDS = 6,
+    BI_CMYK           = 11,
+    BI_CMYKRLE8       = 12,
+    BI_CMYKRLE4       = 13,
+} BMPCompMethod;
 
-int read_file(const char *path, byte **buffer, unsigned long *buffer_size) {
-    FILE* fstream = fopen(path, "rb");
+typedef enum BMPDIBHeader {
+    BITMAPCOREHEADER    = 12,
+    OS22XBITMAPHEADER   = 16,
+    BITMAPINFOHEADER    = 40,
+    BITMAPV2INFOHEADER  = 54,
+    BITMAPV3INFOHEADER  = 56,
+    OS22XBITMAPHEADER_L = 64,
+    BITMAPV4HEADER      = 108,
+    BITMAPV5HEADER      = 124,
+} BMPDIBHeader;
 
+typedef struct __attribute__((packed)) BMPHeader {
+    uint16_t type;
+    uint32_t fileSize;
+    uint16_t reserved0;
+    uint16_t reserved1;
+    uint32_t dataOffset;
+
+    // NOTE: DIB Header
+    uint32_t      dibSize;
+    int32_t       width;
+    int32_t       height;
+    uint16_t      colorPlanesCount;
+    uint16_t      bitsPerPixel;
+    BMPCompMethod compression;
+    uint32_t      imageSize;
+    int32_t       xResolution;
+    int32_t       yResolution;
+    uint32_t      colorUsed;
+    uint32_t      colorImportant;
+} BMPHeader;
+
+typedef struct ByteBuffer {
+    byte *data;
+    uint64_t size;
+} ByteBuffer;
+
+typedef struct Color {
+    uint8_t b, g, r;
+} Color;
+
+typedef struct BMPImage {
+    BMPHeader *header;
+
+    uint64_t width, height;
+    Color *pixels;
+} BMPImage;
+
+void BMPImage_Free(void *ptr) {
+    BMPImage *image = (BMPImage*)ptr;
+    free(image->header);
+    free(image->pixels);
+    free(image);
+}
+
+typedef enum ReadBMPStatus {
+    READBMP_OK  = 0,
+    READBMP_ERR = 1,
+    READBMP_UNSUPPORTED_DIBHEADER = 10,
+    READBMP_UNSUPPORTED_COMPRESSION = 20,
+} ReadBMPStatus;
+
+#define COPY_FROM_BUFFER(B, S, F, D) \
+    memcpy(&D->F, &B->data[offsetof(S, F)], sizeof(D->F))
+
+ReadBMPStatus BMPImage_Read(const ByteBuffer *buffer, BMPImage **out) {
+    BMPHeader *header = malloc(sizeof(BMPHeader));
+    BMPImage  *image  = malloc(sizeof(BMPImage ));
+
+    image->header = header;
+
+    COPY_FROM_BUFFER(buffer, BMPHeader, type, header);
+    COPY_FROM_BUFFER(buffer, BMPHeader, fileSize, header);
+    COPY_FROM_BUFFER(buffer, BMPHeader, reserved0, header);
+    COPY_FROM_BUFFER(buffer, BMPHeader, reserved1, header);
+    COPY_FROM_BUFFER(buffer, BMPHeader, dataOffset, header);
+
+    COPY_FROM_BUFFER(buffer, BMPHeader, dibSize, header);
+
+    if (header->dibSize != BITMAPINFOHEADER) {
+        printf("Error: we suppot only BITMAPINFOHEADER. Got header size of '%d'\n", header->dibSize);
+        return READBMP_UNSUPPORTED_DIBHEADER;
+    }
+
+    COPY_FROM_BUFFER(buffer, BMPHeader, width, header);
+    COPY_FROM_BUFFER(buffer, BMPHeader, height, header);
+    COPY_FROM_BUFFER(buffer, BMPHeader, colorPlanesCount, header);
+
+    if (header->colorPlanesCount != 1) {
+        return READBMP_ERR;
+    }
+
+    COPY_FROM_BUFFER(buffer, BMPHeader, bitsPerPixel, header);
+    COPY_FROM_BUFFER(buffer, BMPHeader, compression, header);
+
+    if (header->compression != BI_RGB) {
+        return READBMP_UNSUPPORTED_COMPRESSION;
+    }
+
+    COPY_FROM_BUFFER(buffer, BMPHeader, imageSize, header);
+    COPY_FROM_BUFFER(buffer, BMPHeader, xResolution, header);
+    COPY_FROM_BUFFER(buffer, BMPHeader, yResolution, header);
+    COPY_FROM_BUFFER(buffer, BMPHeader, colorUsed, header);
+    COPY_FROM_BUFFER(buffer, BMPHeader, colorImportant, header);
+
+    image->width = header->width;
+    image->height = header->height;
+
+    uint64_t size = image->width * image->height;
+    image->pixels = malloc(sizeof(Color) * size);
+    memcpy(
+        image->pixels,
+        &buffer->data[header->dataOffset],
+        sizeof(Color) * size
+        );
+
+    *out = image;
+
+    return READBMP_OK;
+}
+
+typedef enum ReadFileStatus {
+    READFILE_OK  = 0,
+    READFILE_ERR = 1,
+} ReadFileStatus;
+
+ReadFileStatus ByteBuffer_ReadFile(const char *filePath, ByteBuffer **out) {
+    FILE *fstream = fopen(filePath, "r");
     if (fstream == NULL) {
-        printf("[ERROR]: Can't open file on path: '%s'\n", path);
-        return ERR;
+        return READFILE_ERR;
     }
 
     fseek(fstream, 0, SEEK_END);
-    long fsize = ftell(fstream);
+    uint64_t fileSize = ftell(fstream);
     fseek(fstream, 0, SEEK_SET);
 
-    byte *fbuffer = malloc(fsize + 1);
-    fread(fbuffer, sizeof(char), fsize, fstream);
+    ByteBuffer *buffer = malloc(sizeof(ByteBuffer));
+    buffer->data = malloc(sizeof(byte) * fileSize + 1);
+    buffer->size = fileSize;
+
+    fread(buffer->data, sizeof(byte), fileSize, fstream);
     fclose(fstream);
-    fbuffer[fsize] = '\0';
 
-    *buffer = fbuffer;
-    *buffer_size = fsize;
-    return OK;
+    buffer->data[fileSize] = '\0';
+    *out = buffer;
+
+    return READFILE_OK;
 }
 
+void BMPImage_PrintInfo(BMPImage *image) {
+    printf("Type \t\t\t: %d\n"        , image->header->type);
+    printf("FileSize \t\t: %d\n"      , image->header->fileSize);
+    printf("Reserved0 \t\t: %d\n"     , image->header->reserved0);
+    printf("Reserved1 \t\t: %d\n"     , image->header->reserved1);
+    printf("DataOffset \t\t: %d\n"    , image->header->dataOffset);
+    printf("DibSize \t\t: %d\n"       , image->header->dibSize);
+    printf("Width \t\t\t: %d\n"       , image->header->width);
+    printf("Height \t\t\t: %d\n"      , image->header->height);
+    printf("ColorPlanesCount \t: %d\n", image->header->colorPlanesCount);
+    printf("BitsPerPixel \t\t: %d\n"  , image->header->bitsPerPixel);
+    printf("Compression \t\t: %d\n"   , image->header->compression);
+    printf("ImageSize \t\t: %d\n"     , image->header->imageSize);
+    printf("XResolution \t\t: %d\n"   , image->header->xResolution);
+    printf("YResolution \t\t: %d\n"   , image->header->yResolution);
+    printf("ColorUsed \t\t: %d\n"     , image->header->colorUsed);
+    printf("ColorImportant \t\t: %d\n", image->header->colorImportant);
 
-void hex_dump(void* data, unsigned long buffer_length) {
-    byte* buffer = (byte*)data;
-
-    for (unsigned int i = 0; i < buffer_length; i += 16) {
-        printf("%06x: ", i);
-
-        for (unsigned int j = 0; j < 16; j++) {
-            if (i + j < buffer_length) {
-                printf("%02x ", buffer[i + j]);
-            }
-            else {
-                printf("   ");
-            }
-        }
-
-        printf(" ");
-        for (unsigned int j = 0; j < 16; j++) {
-            if (i + j < buffer_length) {
-                printf("%c", isprint(buffer[i + j]) ? buffer[i+j] : '.');
-            }
-        }
-        printf("\n");
-    }
+    Color c = image->pixels[0];
+    printf("First color value: '%x%x%x'\n", c.r, c.g, c.b);
 }
-
-
-typedef struct Buffer {
-    byte* data;
-    unsigned long size;
-} Buffer;
-
-
-bool is_ascii(char c) {
-    return c >= 0 && c <= 127;
-}
-
-
-bool is_binary(Buffer* buf) {
-    return !is_ascii(buf->data[0]);
-}
-
 
 int main(void) {
-    const char* file_path = "data/image.png";
 
-    Buffer buffer = {
-        .data = NULL,
-        .size = 0,
-    };
+    const char *filePath = "./data/image.bmp";
 
-    if (read_file(file_path, &buffer.data, &buffer.size) != OK) {
-        printf("[ERROR]: Error on file reading! '%s'\n", file_path);
-        return ERR;
+    ByteBuffer *buffer = NULL;
+    if (ByteBuffer_ReadFile(filePath, &buffer) != READFILE_OK) {
+        printf("Error on reading file from '%s'.\n", filePath);
+        return 1;
     }
 
-    printf("Reading: '%s'\n", file_path);
-    printf("Type: %s\n", is_binary(&buffer) ? "Binary" : "Text");
-    printf("Hex dump of '%s':\n", file_path);
-    hex_dump(buffer.data, buffer.size);
-
-    return OK;
+    BMPImage *image = NULL;
+    int status = BMPImage_Read(buffer, &image);
+    if (status != READBMP_OK) {
+        printf("Error on reading BMP image from '%s'.\n", filePath);
+        printf("Status code: %d\n", status);
+        return 1;
+    }
+    BMPImage_PrintInfo(image);
+    BMPImage_Free(image);
+    return 0;
 }
