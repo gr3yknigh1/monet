@@ -6,7 +6,7 @@
 #include "libimage/image.h"
 
 void print_usage(void) {
-    printf("./image-transformer <source-image> <transformed-image>\n");
+    printf("./readimage <source-image>\n");
 }
 
 int main(int argc, char **argv) {
