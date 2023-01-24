@@ -2,11 +2,17 @@ MKDIR = mkdir -p
 RM    = rm -rf
 
 CC     = clang
-CFLAGS = -g -Wall -std=c99
+CFLAGS = -g -Wall -Wpedantic -std=c11
+AR     = ar rcs
+
 
 BUILD_DIR = build
 OBJS_DIR  = $(BUILD_DIR)/objs
-TARGET    = $(BUILD_DIR)/rimg
+LIBRARY   = $(BUILD_DIR)/libimage.a
+
+CLI         = $(BUILD_DIR)/readimage
+CLI_DIR     = cli
+CLI_SOURCES = $(CLI_DIR)/*.c
 
 SOURCES_DIR = src
 INCLUDE_DIR = include
@@ -17,15 +23,21 @@ OBJS        = $(patsubst $(SOURCES_DIR)/%.c, $(OBJS_DIR)/%.o, $(SOURCES))
 
 default: all
 
-all: $(TARGET)
+all: $(LIBRARY) $(CLI)
 
-release: CFLAGS=-Wall -O3 -DNDEBUG
+release: CFLAGS=-O3 -Werror
 release: clean
-release: $(TARGET)
+release: $(LIBRARY)
 
-$(TARGET): $(BUILD_DIR) $(OBJS_DIR) $(OBJS)
-	$(RM) $(TARGET)
-	$(CC) $(CFLAGS) $(OBJS) -o $@
+$(LIBRARY): $(OBJS)
+	$(RM) $(LIBRARY)
+	$(AR) $@ $<
+
+$(CLI): $(LIBRARY)
+	$(RM) $(CLI)
+	$(CC) $(CFLAGS) $(CLI_SOURCES) $(OBJS) -I$(INCLUDE_DIR) -o $@
+
+$(OBJS): $(BUILD_DIR) $(OBJS_DIR)
 
 $(OBJS_DIR)/%.o: $(SOURCES_DIR)/%.c $(INCLUDE_DIR)/**/%.h
 	$(CC) $(CFLAGS) -c $< -o $@ -I $(INCLUDE_DIR)
@@ -43,7 +55,7 @@ clean:
 	$(RM) $(BUILD_DIR)
 
 run:
-	@$(TARGET)
+	@$(LIBRARY)
 
 .PHONY: all, clean
 
