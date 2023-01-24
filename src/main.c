@@ -1,52 +1,51 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#include "readimage/io.h"
-#include "readimage/image.h"
-#include "readimage/bmp.h"
+#include "libimage/bmp.h"
+#include "libimage/image.h"
 
-int PrintUsage() {
-    printf("usage: rimg [-v | --version] [-h | --help]\n");
-    printf("            <image_path>                  \n");
-    return 0;
-}
-
-int ReadImage(const char *filePath) {
-
-    ByteBuffer *buffer = NULL;
-    {
-        int status = ByteBuffer_ReadFile(filePath, &buffer);
-        if (status != READFILE_OK) {
-            if (status == READFILE_FILENOTEXITS) {
-                printf("Error: file not exits! '%s'", filePath);
-            } else {
-                printf("Error on reading file from '%s'.\n", filePath);
-            }
-            return 1;
-        }
-    }
-
-    BMPImage *image = NULL;
-    {
-        int status = BMPImage_Read(buffer, &image);
-        if (status != READBMP_OK) {
-            printf("Error on reading BMP image from '%s'.\n", filePath);
-            printf("Status code: %d\n", status);
-            return 1;
-        }
-    }
-    BMPImage_PrintInfo(image);
-    BMPImage_Free(image);
-
-    return 0;
+void print_usage(void) {
+    printf("./image-transformer <source-image> <transformed-image>\n");
 }
 
 int main(int argc, char **argv) {
-
-    if (argc == 1) {
-        return PrintUsage();
-    } else if (argc >= 2) {
-        return ReadImage(argv[1]);
+    if (argc < 3) {
+        print_usage();
+        return 0;
     }
 
-    return 1;
+    const char *source_path = argv[1];
+    const char *dest_path = argv[2];
+
+    struct image source_image = {0};
+    struct bmp_header header = {0};
+
+    enum read_status r_status = read_bmp(source_path, &source_image, &header);
+    if (r_status != READ_OK) {
+        fprintf(
+            stderr, "Error while reading image '%s', status code: '%d'\n",
+            source_path, r_status
+        );
+        return 1;
+    }
+
+    struct image rotated_image = rotate_image(&source_image, ROTATION_LEFT);
+    header.width = rotated_image.width;
+    header.height = rotated_image.height;
+
+    enum write_status w_status = write_bmp(dest_path, &rotated_image, &header);
+    if (w_status != WRITE_OK) {
+        fprintf(
+            stderr,
+            "Error while writing image out to path '%s'. Status code: '%d'\n",
+            dest_path, w_status
+        );
+        return 1;
+    }
+
+    free(source_image.pixels);
+    free(rotated_image.pixels);
+
+    return 0;
 }
