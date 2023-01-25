@@ -37,14 +37,6 @@ void hex_dump(void *data, unsigned long buffer_length) {
     }
 }
 
-unsigned long get_file_size(FILE *fstream) {
-    long initial_position = ftell(fstream);
-    fseek(fstream, 0, SEEK_END);
-    unsigned long file_size = ftell(fstream);
-    fseek(fstream, initial_position, SEEK_SET);
-    return file_size;
-}
-
 enum read_status read_file(
     const char *file_path, struct byte_buffer *buffer
 ) {
@@ -58,7 +50,10 @@ enum read_status read_file(
         return READ_ERR;
     }
 
-    unsigned long size = get_file_size(fstream);
+    fseek(fstream, 0, SEEK_END);
+    unsigned long size = ftell(fstream);
+    fseek(fstream, 0, SEEK_SET);
+
     unsigned char *data = malloc(size);
 
     fread(data, sizeof(char), size, fstream);

@@ -4,8 +4,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-unsigned long get_file_size(FILE *fstream);
-
 void hex_dump(void *data, uint64_t buffer_length);
 
 struct byte_buffer {
