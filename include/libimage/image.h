@@ -20,4 +20,9 @@ enum rotation {
 };
 
 struct image rotate_image(const struct image *source, enum rotation rotation);
+
+
+void read_image(const char *path, struct image *image);
+
+
 #endif // IMAGE_H

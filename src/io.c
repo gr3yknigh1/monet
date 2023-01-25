@@ -13,15 +13,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void hex_dump(void *data, unsigned long buffer_length) {
-    unsigned char *buffer = (unsigned char *)data;
+void hex_dump(unsigned char *data, size_t size) {
 
-    for (unsigned int i = 0; i < buffer_length; i += 16) {
+    for (unsigned int i = 0; i < size; i += 16) {
         printf("%06x: ", i);
 
         for (unsigned int j = 0; j < 16; j++) {
-            if (i + j < buffer_length) {
-                printf("%02x ", buffer[i + j]);
+            if (i + j < size) {
+                printf("%02x ", data[i + j]);
             } else {
                 printf("   ");
             }
@@ -29,8 +28,8 @@ void hex_dump(void *data, unsigned long buffer_length) {
 
         printf(" ");
         for (unsigned int j = 0; j < 16; j++) {
-            if (i + j < buffer_length) {
-                printf("%c", isprint(buffer[i + j]) ? buffer[i + j] : '.');
+            if (i + j < size) {
+                printf("%c", isprint(data[i + j]) ? data[i + j] : '.');
             }
         }
         printf("\n");
@@ -38,35 +37,34 @@ void hex_dump(void *data, unsigned long buffer_length) {
 }
 
 enum read_status read_file(
-    const char *file_path, struct byte_buffer *buffer
+    const char *path, unsigned char *dest, size_t *size
 ) {
-    if (access(file_path, F_OK) != 0) {
+    if (access(path, F_OK) != 0) {
         return READ_FILE_NOT_FOUND;
     }
 
-    FILE *fstream = fopen(file_path, "r");
+    FILE *fstream = fopen(path, "r");
 
     if (fstream == NULL) {
         return READ_ERR;
     }
 
     fseek(fstream, 0, SEEK_END);
-    unsigned long size = ftell(fstream);
+    *size = ftell(fstream);
     fseek(fstream, 0, SEEK_SET);
 
-    unsigned char *data = malloc(size);
+    dest = malloc(*size);
 
-    fread(data, sizeof(char), size, fstream);
+    fread(dest, sizeof(char), *size, fstream);
     fclose(fstream);
-
-    buffer->data = data;
-    buffer->size = size;
 
     return READ_OK;
 }
 
-enum write_status write_file(const char *file_path, struct byte_buffer *buffer) {
-    FILE *fstream = fopen(file_path, "w");
+enum write_status write_file(
+    const char *path, const unsigned char *src, const size_t size
+) {
+    FILE *fstream = fopen(path, "w");
 
     if (fstream == NULL) {
         return WRITE_ERR;
@@ -74,8 +72,8 @@ enum write_status write_file(const char *file_path, struct byte_buffer *buffer) 
 
     // NOTE: Can't pass MSan check:
     // "SUMMARY: MemorySanitizer: use-of-uninitialized-value"
-    for (unsigned long i = 0; i < buffer->size; i++) {
-        fputc(buffer->data[i], fstream);
+    for (unsigned long i = 0; i < size; i++) {
+        fputc(src[i], fstream);
     }
 
     fclose(fstream);

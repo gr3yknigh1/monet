@@ -4,12 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-void hex_dump(void *data, uint64_t buffer_length);
-
-struct byte_buffer {
-    unsigned char *data;
-    uint64_t size;
-};
+void hex_dump(unsigned char *data, size_t size);
 
 enum read_status {
     READ_OK,
@@ -22,7 +17,7 @@ enum read_status {
 };
 
 enum read_status read_file(
-    const char *file_path, struct byte_buffer *buffer
+    const char *path, unsigned char *dest, size_t *size
 );
 
 enum write_status {
@@ -31,6 +26,6 @@ enum write_status {
 };
 
 enum write_status write_file(
-    const char *file_path, struct byte_buffer *buffer
+    const char *path, const unsigned char *src, const size_t size
 );
 #endif // IO_H
