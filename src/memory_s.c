@@ -1,4 +1,4 @@
-#include "libimage/memory_s.h"
+#include "monet/memory_s.h"
 
 int memcpy_s(void *const dest, size_t const destsz, void const *const src, size_t const count) {
     if (dest == NULL || src == NULL || count > destsz) {

@@ -1,4 +1,4 @@
-#include "libimage/image.h"
+#include "monet/image.h"
 
 #include <memory.h>
 #include <stdlib.h>

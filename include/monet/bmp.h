@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-#include "libimage/image.h"
-#include "libimage/io.h"
+#include "monet/image.h"
+#include "monet/io.h"
 
 enum bi_dib_header {
     BI_BITMAPCOREHEADER = 12,

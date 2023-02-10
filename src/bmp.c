@@ -2,9 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "libimage/bmp.h"
-#include "libimage/io.h"
-#include "libimage/memory_s.h"
+#include "monet/bmp.h"
+#include "monet/io.h"
+#include "monet/memory_s.h"
 
 void print_header_info(struct bmp_header *header) {
     printf("Type \t\t\t: %d\n", header->type);

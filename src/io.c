@@ -1,4 +1,4 @@
-#include "libimage/io.h"
+#include "monet/io.h"
 
 // NOTE: for `access` function and file existing checking
 #ifdef WIN32
@@ -72,8 +72,6 @@ enum write_status write_file(const char *file_path, struct byte_buffer *buffer) 
         return WRITE_ERR;
     }
 
-    // NOTE: Can't pass MSan check:
-    // "SUMMARY: MemorySanitizer: use-of-uninitialized-value"
     for (unsigned long i = 0; i < buffer->size; i++) {
         fputc(buffer->data[i], fstream);
     }
