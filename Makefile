@@ -1,61 +1,83 @@
-MKDIR = mkdir -p
-RM    = rm -rf
+MKDIR  = mkdir -p
+REMOVE = rm -rf
 
 CC     = clang
-CFLAGS = -g -Wall -Wpedantic -std=c11
-AR     = ar rcs
+CFLAGS = -g -Wall -std=c17
+
+MKFILE_PATH = $(abspath $(lastword $(MAKEFILE_LIST)))
+MKFILE_DIR  = $(dir $(MKFILE_PATH))
+
+PROJECT_NAME      = monet
+
+PROJECT_DIR = $(MKFILE_DIR:-=)
+
+INCLUDE_DIR = $(PROJECT_DIR)include
+SOURCES_DIR = $(PROJECT_DIR)src
+BUILD_DIR   = $(PROJECT_DIR)build
+TESTS_DIR   = $(PROJECT_DIR)tests
+
+LIBRARY     = $(BUILD_DIR)/lib$(PROJECT_NAME).a
+
+OBJ_DIR       = $(BUILD_DIR)/objs
+TESTS_BIN_DIR = $(BUILD_DIR)/tests
+
+TESTS_SOURCES = $(wildcard $(TESTS_DIR)/*.c)
+TESTS_BINS    = $(patsubst $(TESTS_DIR)/%.c, $(TESTS_BIN_DIR)/%, $(TESTS_SOURCES))
+
+SOURCES = $(wildcard $(SOURCES_DIR)/*.c)
+HEADERS = $(wildcard $(INCLUDE_DIR)/**/*.h)
+OBJS    = $(patsubst $(SOURCES_DIR)/%.c, $(OBJ_DIR)/%.o, $(SOURCES))
 
 
-BUILD_DIR = build
-OBJS_DIR  = $(BUILD_DIR)/objs
-LIBRARY   = $(BUILD_DIR)/libimage.a
+FORMATTER = clang-format
+FORMATTER_FLAGS = -i
 
-CLI         = $(BUILD_DIR)/readimage
-CLI_DIR     = cli
-CLI_SOURCES = $(CLI_DIR)/*.c
-
-SOURCES_DIR = src
-INCLUDE_DIR = include
-
-SOURCES     = $(wildcard $(SOURCES_DIR)/*.c)
-HEADERS     = $(wildcard $(INCLUDE_DIR)/*.h)
-OBJS        = $(patsubst $(SOURCES_DIR)/%.c, $(OBJS_DIR)/%.o, $(SOURCES))
 
 default: all
+all: $(LIBRARY)
 
-all: $(LIBRARY) $(CLI)
-
-release: CFLAGS=-O3 -Werror
+release: CFLAGS=-Wall -O3 -DNDEBUG
 release: clean
 release: $(LIBRARY)
 
-$(LIBRARY): $(OBJS)
+
+$(LIBRARY): $(BUILD_DIR) $(OBJ_DIR) $(OBJS)
 	$(RM) $(LIBRARY)
-	$(AR) $@ $<
-
-$(CLI): $(LIBRARY)
-	$(RM) $(CLI)
-	$(CC) $(CFLAGS) $(CLI_SOURCES) $(OBJS) -I$(INCLUDE_DIR) -o $@
-
-$(OBJS): $(BUILD_DIR) $(OBJS_DIR)
-
-$(OBJS_DIR)/%.o: $(SOURCES_DIR)/%.c $(INCLUDE_DIR)/**/%.h
-	$(CC) $(CFLAGS) -c $< -o $@ -I $(INCLUDE_DIR)
-
-$(OBJS_DIR)/%.o: $(SOURCES_DIR)/%.c
-	$(CC) $(CFLAGS) -c $< -o $@ -I $(INCLUDE_DIR)
-
-$(OBJS_DIR):
-	$(MKDIR) $@
+	ar -cvrs $(LIBRARY) $(OBJS)
 
 $(BUILD_DIR):
 	$(MKDIR) $@
 
-clean:
-	$(RM) $(BUILD_DIR)
+$(OBJ_DIR):
+	$(MKDIR) $@
 
-run:
-	@$(LIBRARY)
+$(OBJ_DIR)/%.o: $(SOURCES_DIR)/%.c $(INCLUDE_DIR)/$(PROJECT_NAME)/%.h
+	$(CC) $(CFLAGS) -c $< -o $@ -I$(INCLUDE_DIR)
 
-.PHONY: all, clean
+$(OBJ_DIR)/%.o: $(SOURCES_DIR)/%.c
+	$(CC) $(CFLAGS) -c $< -o $@ -I$(INCLUDE_DIR)
+
+$(TESTS_BIN_DIR)/%: $(TESTS_DIR)/%.c
+	$(CC) $(CFLAGS) $< $(OBJS) -o $@ -lcriterion -I$(INCLUDE_DIR)
+
+tests: $(LIBRARY) $(TESTS_BIN_DIR) $(TESTS_BINS)
+	@for test in $(TESTS_BINS); do $$test ; done
+
+$(TESTS_BIN_DIR):
+	$(MKDIR) $@
+
+
+clean veryclean:
+	$(REMOVE) $(BUILD_DIR)
+
+format-source:
+	$(FORMATTER) $(FORMATTER_FLAGS) $(SOURCES)
+	$(FORMATTER) $(FORMATTER_FLAGS) $(HEADERS)
+
+format-tests:
+	$(FORMATTER) $(FORMATTER_FLAGS) $(TESTS_SOURCES)
+
+format: format-source format-tests
+
+.PHONY: default, all, main, clean
 
